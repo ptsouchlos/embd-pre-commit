@@ -1,0 +1,60 @@
+name: Sync embd release
+
+on:
+  repository_dispatch:
+    types: [embd-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "embd version to sync (e.g. 0.4.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Bump embd-cli and tag
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update pyproject.toml
+        env:
+          RAW_VERSION: ${{ github.event.client_payload.version || inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${RAW_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version: $RAW_VERSION" >&2
+            exit 1
+          fi
+
+          python3 -c '
+          import pathlib, re, sys
+          ver = sys.argv[1]
+          p = pathlib.Path("pyproject.toml")
+          text = p.read_text()
+          text, n1 = re.subn(r"^version = \".*\"", f"version = \"{ver}\"", text, count=1, flags=re.M)
+          text, n2 = re.subn(r"\"embd-cli==[^\"]*\"", f"\"embd-cli=={ver}\"", text, count=1)
+          assert n1 == 1 and n2 == 1, f"Unexpected replacements: n1={n1}, n2={n2}"
+          p.write_text(text)
+          ' "$version"
+
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Commit and tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --quiet pyproject.toml; then
+            git add pyproject.toml
+            git commit -m "chore: bump embd-cli to v${VERSION}"
+            git push origin HEAD:main
+          fi
+
+          git tag -f "v${VERSION}"
+          git push -f origin "v${VERSION}"
