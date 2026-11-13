@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embd-pre-commit"
-version = "0.4.0"
+version = "0.5.0"
 description = "Pre-commit hook for embd (using pre-built embd-cli wheels)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 dependencies = [
-  "embd-cli==0.4.0",
+  "embd-cli==0.5.0",
 ]
 
 [tool.setuptools]
